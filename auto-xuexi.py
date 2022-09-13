@@ -40,7 +40,9 @@ if __name__ == '__main__':
 
 
 
-    device = u2.connect(SN)
+    # device = u2.connect(SN)
+    device = u2.connect('10.0.51.134:6666')
+
     print(device.info)
 
     xpath_dict = dict()  # xpath路径
@@ -167,7 +169,7 @@ if __name__ == '__main__':
 
             # 已知答案
             if right_answer != '' and right_answer is not None:
-                print('已知答案：')
+                print('已知答案：', right_answer)
                 for answer_e in answers_e:
                     if answer_e.text == right_answer:
                         right_button = answer_e
@@ -177,8 +179,7 @@ if __name__ == '__main__':
 
             # 已知部分错误选项
             else:
-                print('不知答案：')
-                print(answers_e)
+                print('不知答案：', error_answers)
                 for answer_e in answers_e:
                     print(error_answers)
                     if answer_e.text in error_answers:
@@ -188,12 +189,6 @@ if __name__ == '__main__':
                         print('false:', answer_e.text)
                         temp_right_button = answer_e
                         break
-
-            # # 手机显示提示
-            # if create_status:
-            #     device.toast.show(f'第一次抽取到该题目,默认选第一个选项\n点击选项: {temp_right_button.text}', 5)
-            # else:
-            #     device.toast.show(f'第[{json.loads(question_.description)["times"]}]次遇到该题目\nTrueAnswer: {right_answer}\nFalseAnswer: {error_answers}\n点击选项: {temp_right_button.text}', 5)
 
             # 点击选项
             if right_button is None:
