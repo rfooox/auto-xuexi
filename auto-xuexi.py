@@ -37,8 +37,6 @@ if __name__ == '__main__':
     database = SqliteDatabase(db_name)
     database.create_tables([TiaoZhanQuestion],)
 
-
-
     # device = u2.connect(SN)
     device = u2.connect('10.0.51.134:6666')
 
@@ -73,19 +71,6 @@ if __name__ == '__main__':
     else:
         exit(1)
 
-
-    # 解锁手机
-    # device.screen_off()  # 锁屏
-    # device.screen_on()  # 点亮屏幕
-    # device.swipe_points([(490, 1500), (490, 400)], 0.2)  # 划开解锁界面
-    # device(text='9').click()
-    # device(text='7').click()
-    # device(text='0').click()
-    # device(text='2').click()
-    # device(text='2').click()
-    # device(text='3').click()
-
-    # device.app_start('com.huawei.android.launcher')
     device.app_start('cn.xuexi.android', stop=True)
 
     # 打开挑战答题
@@ -123,15 +108,13 @@ if __name__ == '__main__':
             else:
                 """不是创建项目， 有记录"""
                 print('读取数据库记录')
-                right_answer = question_.right_answer
-                temp_str = question_.error_answers
-                print(f'正确选项记录:{right_answer}')
-                if temp_str is not None:
-                    error_answers = temp_str.split('|')
-                    print(f'错误选项记录:{error_answers}')
+                if question_.right_answer is not None:
+                    right_answer = question_.right_answer
+                elif question_.error_answers is not None:
+                    temp_str = question_.error_answers
+                    error_answers = question_.error_answers.split('|')
                 else:
                     error_answers = []
-                    print(f'错误选项记录:{error_answers}')
 
             # 更新次数内容
             if question_.description is None and not create_status:
@@ -163,9 +146,6 @@ if __name__ == '__main__':
             # 确定点击谁
             right_button = None
             temp_right_button = None
-            print(f'初始化 right_button:{right_button}')
-            print(f'right_answer: {right_answer}')
-            print(f'error_answers: {error_answers}')
 
             # 已知答案
             if right_answer != '' and right_answer is not None:
@@ -179,14 +159,10 @@ if __name__ == '__main__':
 
             # 已知部分错误选项
             else:
-                print('不知答案：', error_answers)
                 for answer_e in answers_e:
-                    print(error_answers)
                     if answer_e.text in error_answers:
-                        print('true:', answer_e.text)
                         continue
                     else:
-                        print('false:', answer_e.text)
                         temp_right_button = answer_e
                         break
 
