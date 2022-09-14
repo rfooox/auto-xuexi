@@ -1,5 +1,4 @@
 import time
-
 import uiautomator2 as u2
 # import logging
 # import time
@@ -103,6 +102,7 @@ if __name__ == '__main__':
             # 选项
             answers_e = device.xpath(xpath_dict['tiaozhan_answer']).all()
             answer_list = [e.text for e in answers_e]
+            answer_list.sort()  # 获取选项时排序
 
             # 读取或创建
             question_, create_status = TiaoZhanQuestion.get_or_create(title=t_text, answers='|'.join(answer_list))
@@ -196,7 +196,8 @@ if __name__ == '__main__':
 
                 # 进入下一题
                 time.sleep(time_dict['normal'])
-                if device.xpath(xpath_dict['tiaozhan_title']).click_exists() \
+                time.sleep(time_dict['normal'])
+                if device.xpath(xpath_dict['tiaozhan_title']).exists \
                         and device.xpath(xpath_dict['tiaozhan_title']).get_text() != t_text:
                     question_.right_answer = temp_right_button.text
                     question_.error_answers = '|'.join([a for a in answer_list if a != temp_right_button.text])
