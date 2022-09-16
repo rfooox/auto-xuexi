@@ -1,6 +1,6 @@
 import time
 import uiautomator2 as u2
-# import logging
+import logging
 # import time
 import datetime
 from peewee import *
@@ -33,19 +33,36 @@ class TiaoZhanQuestion(Model):
 
 
 if __name__ == '__main__':
+    # 初始化logging
+    log = logging.getLogger('log')
+    log.setLevel(logging.DEBUG)
+    fmt = logging.Formatter(fmt='%(asctime)s - %(levelname)-9s-%(filename)-8s: %(lineno)s line - %(message)s')
+
+    log_screen_out = logging.StreamHandler()
+    log_screen_out.setLevel(logging.DEBUG)
+    log_screen_out.setFormatter(fmt)
+
+    log_file_out = logging.FileHandler(filename='debug.log', mode='a', encoding='utf-8')
+    log_file_out.setFormatter(fmt)
+
+    log.addHandler(log_screen_out)
+    log.addHandler(log_file_out)
+
     # 初始化数据库
+    log.debug('连接数据库')
     database = SqliteDatabase(db_name)
+    log.debug('初始化数据表：【TiaoZhanQuestion】')
     database.create_tables([TiaoZhanQuestion],)
 
     # device = u2.connect(SN)
+    log.debug('连接手机："10.0.51.134:6666"')
     device = u2.connect('10.0.51.134:6666')
-
-    print(device.info)
 
     xpath_dict = dict()  # xpath路径
     # 判断设备型号
     if device.info['productName'] == 'SEA-AL10':
-        print(device.info['productName'])
+        log.debug('匹配型号成功：SEA-AL10')
+        log.debug('初始化xpath_dict')
         # 我的
         xpath_dict['mine'] = '//*[@resource-id="cn.xuexi.android:id/comm_head_xuexi_mine"]'
         # 我的-我要答题
@@ -69,29 +86,48 @@ if __name__ == '__main__':
         xpath_dict['xuexi_tiaozhan_4_answer'] = ''
 
     else:
+        log.info('机型不匹配，退出程序')
         exit(1)
 
+    # TODO: 改为恢复到初始界面，停用 重新打开
+    log.debug('停止并重新打开应用：cn.xuexi.android')
     device.app_start('cn.xuexi.android', stop=True)
 
     # 打开挑战答题
+
+    log.debug('点击【我的】')
     device.xpath(xpath_dict['mine']).click_exists()
+    log.debug('点击【我要答题】')
     device.xpath(xpath_dict['practice']).click_exists()
+    log.debug('点击【挑战答题】')
     device.xpath(xpath_dict['tiaozhan']).click_exists()
 
+    log.info('获取题库模式')
     while True:
-        if device.xpath(xpath_dict['tiaozhan_title']).click_exists():
-
+        # TODO: 读题
+        log.debug('判断题目是否正常出现')
+        if device.xpath(xpath_dict['tiaozhan_title']).exists and device.xpath(xpath_dict['tiaozhan_answer']).exists \
+                and device.xpath(xpath_dict['tiaozhan_title']).get_text() != '' \
+                and device.xpath(xpath_dict['tiaozhan_answer']).get_text() != '':
+            # 若题目存在
+            log.debug('题目正常读取')
             # 题目
             t_text = device.xpath(xpath_dict['tiaozhan_title']).get_text()
 
             # 选项
             answers_e = device.xpath(xpath_dict['tiaozhan_answer']).all()
             answer_list = [e.text for e in answers_e]
+            log.debug('选项排序')
             answer_list.sort()  # 获取选项时排序
 
+            log.debug(f'题目：{t_text}')
+            log.debug(f'选项：{answer_list}')
+
             # 读取或创建
+            log.debug('查询数据库是否有此题')
             question_, create_status = TiaoZhanQuestion.get_or_create(title=t_text, answers='|'.join(answer_list))
 
+            temp_dict = dict()
             # 题目
             error_answers = []
             right_answer = ''
@@ -99,102 +135,137 @@ if __name__ == '__main__':
             # 创建新题目/读取项目内容
             if create_status:
                 """创建新的条目"""
-                print('创建一条新数据，记录对应选项')
-                question_.answers = '|'.join(answer_list)
-                temp_dict = json.loads(question_.description)
                 temp_dict['times'] = 1
+                log.debug('第一次遇到此题，计次初始化为1')
                 question_.description = json.dumps(temp_dict)
-                question_.save()
             else:
                 """不是创建项目， 有记录"""
-                print('读取数据库记录')
-                if question_.right_answer is not None:
-                    right_answer = question_.right_answer
-                elif question_.error_answers is not None:
-                    temp_str = question_.error_answers
-                    error_answers = question_.error_answers.split('|')
-                else:
-                    error_answers = []
-
-            # 更新次数内容
-            if question_.description is None and not create_status:
-                # question_.description 为空
-                question_.description = json.dumps({'times': 1})
-                question_.save()
-                print(f'数据库中描述内容:为空, 重置为:{question_.description}')
-            else:
-
                 temp_dict = json.loads(question_.description)
-                print(f'数据库中描述内容,字典化后:{temp_dict}')
+                log.debug(f'数据库中描述内容,字典化后:{temp_dict}')
                 if type(temp_dict) != dict:
+                    log.debug(f"""{temp_dict}:不是字典, 重置为:{{'times': 0}}""")
                     temp_dict = {'times': 0}
                     question_.description = json.dumps(temp_dict)
-                    question_.save()
-                    print(f"""{temp_dict}:不是字典, 重置为:{{'times': 0}}""")
 
                 if 'times' not in temp_dict.keys() or type(temp_dict['times']) != int:
-                    print(f'关键词 times 不在字典中, 添加 times: 1; 或者 times的值不为int类型')
+                    log.debug(f'关键词 times 不在字典中, 添加 times: 1; 或者 times的值不为int类型')
                     temp_dict['times'] = 1
                     question_.description = json.dumps(temp_dict)
-                    question_.save()
                 else:
-                    print('增加1')
+
                     temp_dict['times'] += 1
                     question_.description = json.dumps(temp_dict)
-                    question_.save()
+                    log.debug(f'遇题次数加1：{temp_dict}')
+
+                log.info('读取数据库记录选项情况')
+                if question_.right_answer is not None:
+
+                    right_answer = question_.right_answer
+                    log.debug(f'读取正确答案：{right_answer}')
+
+                if question_.error_answers is not None:
+                    temp_str = question_.error_answers
+                    error_answers = question_.error_answers.split('|')
+                    log.debug(f'读取错误答案：{error_answers}')
+                else:
+                    log.debug('错误答案无记录，初始化error_answers')
+                    error_answers = []
 
             # 确定点击谁
+            log.debug('初始化：正确按钮与可能正确按钮')
             right_button = None
             temp_right_button = None
 
             # 已知答案
             if right_answer != '' and right_answer is not None:
-                print('已知答案：', right_answer)
+                log.info(f'已知答案：{right_answer}')
+                log.debug('确认与正确答案匹配按钮元素')
                 for answer_e in answers_e:
                     if answer_e.text == right_answer:
                         right_button = answer_e
                         temp_right_button = right_button
+                        question_.update_time = datetime.datetime.now()
+                        question_.save()
+                        log.debug(f'正确选项为：{right_button.text}')
                     else:
                         continue
 
             # 已知部分错误选项
             else:
+                log.debug('未知正确答案，读取错误选项记录')
                 for answer_e in answers_e:
                     if answer_e.text in error_answers:
+                        log.debug(f'选项：{answer_e.text}，包含在错误选记录中（{error_answers}）')
                         continue
                     else:
                         temp_right_button = answer_e
+                        log.debug(f'可能正确选项为：{temp_right_button.text}')
                         break
 
             # 点击选项
+            log.info('点击选项')
             if right_button is None:
+                log.debug('不知道正确答案，点击【可能正确】选项')
                 temp_right_button.click()
 
-                # 进入下一题
-                time.sleep(time_dict['normal'])
-                time.sleep(time_dict['normal'])
-                if device.xpath(xpath_dict['tiaozhan_title']).exists \
-                        and device.xpath(xpath_dict['tiaozhan_title']).get_text() != t_text:
-                    question_.right_answer = temp_right_button.text
-                    question_.error_answers = '|'.join([a for a in answer_list if a != temp_right_button.text])
-                    question_.save()
+                t_time = 0
+                while True:
+                    # TODO: 循环检测点击后情况
+                    # TODO: 加入时间检测
+                    log.debug(f'点击后等待时长：{t_time}')
+                    time.sleep(2)
+                    if t_time > 20:
+                        # 超时
+                        log.debug('超时退出')
+                        exit('timeout')
+                        # break
+                    t_time += 2
 
-                # 答题失败
-                elif device.xpath(xpath_dict['tiaozhan_end']).click_exists():
-                    error_answers.append(temp_right_button.text)
-                    question_.error_answers = '|'.join(error_answers)
-                    question_.save()
-                    time.sleep(time_dict['long'])
-                    time.sleep(time_dict['long'])
-                    device.xpath('//*[@text="结束本局"]').click_exists()
-                    device.xpath('//*[@text="再来一局"]').click_exists()
-                    time.sleep(time_dict['long'])
+                    # 进入下一题
+                    if device.xpath(xpath_dict['tiaozhan_title']).exists \
+                            and device.xpath(xpath_dict['tiaozhan_title']).get_text() != t_text:
+                        log.info('成功进入下一题')
+                        # 更新数据库
+                        log.debug('将正确选项写入数据库')
+                        question_.right_answer = temp_right_button.text
+                        question_.error_answers = '|'.join([a for a in answer_list if a != temp_right_button.text])
+                        question_.update_time = datetime.datetime.now()
+                        question_.save()
+                        log.debug('写入成功，进入下一题')
+                        break
 
+                    # 答题失败
+                    elif device.xpath(xpath_dict['tiaozhan_end']).exists:
+                        error_answers.append(temp_right_button.text)
+                        log.debug('点击错误选项，更新至数据库')
+                        question_.error_answers = '|'.join(error_answers)
+                        question_.update_time = datetime.datetime.now()
+                        question_.save()
+                        device.xpath('//*[@text="结束本局"]').click_exists()
+                        time.sleep(time_dict['long'])
+                        device.xpath('//*[@text="再来一局"]').click_exists()
+                        log.debug('点击错误选项，进入下一题')
+                        break
 
             else:
+                log.debug('已知正确答案，点击【正确】选项')
                 right_button.click()
-                time.sleep(time_dict['long'])
 
+                while True:
+                    # TODO: 加入超时计时
+                    # TODO: 更新次数
+                    if device.xpath(xpath_dict['tiaozhan_title']).exists \
+                            and device.xpath(xpath_dict['tiaozhan_title']).get_text() != t_text:
+                        log.debug('点击正确选项，进入下一题')
+                        break
+
+            # 异常情况处理
+            if device.xpath('//*[@text="结束本局"]').exists:
+                log.debug('异常发现结束本局')
+                device.xpath('//*[@text="结束本局"]').click_exists()
+            if device.xpath('//*[@text="再来一局"]').exists:
+                log.debug('异常发现再来一局')
+                device.xpath('//*[@text="再来一局"]').click_exists()
 
 
 
